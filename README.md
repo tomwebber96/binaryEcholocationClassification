@@ -4,9 +4,9 @@
 
 *Created with DALL·E: "Deep learning classifier for dolphin echolocation".*
 
-## Short Summary Here
+## Summary
+This deep learning tool aims to aid in odontocete species identification by classifying recorded echolocation clicks. The example provided here is a binary classification for Risso's dolphins in UK waters, but the model can be re-trained for other species and regions as required. The Risso's dolphin models have been devloped for data (re)sampled at 96 kHz or 250 kHz in UK waters.  Trained on towed multi-channel visually verified single species data, with the 96 kHz model tested on novel static data. See PAPER LINK for details. The models provided in this repository can be used either within exisitng PAMGuard workflows, or run on PAMGuard click detections outside of PAMGuard using python. A .py script is provided which could be modified to enable classification of normalised waveform snipits created by other impulsive noise detectors.
 
-Paper Link Here
 
 ## Running within PAMGuard
  First clone this binaryClickClassifier repo. Within /IGNORE/PAMGuard/ is an example .psfx for running the 96kHz classifier on single channel data. The actual input .wav example sampled at 96 kHz can be downloaded here. The click detector in this case is run on raw input data. Where collected at >96 kHz, re-sample data within PAMGuard and run click detector on resampled data. Most importantly, include the two 10 kHz high pass butteworth filters. The trigger threshold here is set to the default 10 dB but can be updated as required.
