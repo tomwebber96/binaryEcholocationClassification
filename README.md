@@ -14,7 +14,7 @@ Paper Link Here
  
  Ouputs will be stored in deep learning .pgdf's. See classiferOutput.r for a basic example of averaging classifications into time bins and basic plotting. 
  
- ## Running from .bat file
+ ## Running from a windows .bat file
  Ensure you have a python installation (3.9.12 - tested and working - https://www.python.org/downloads/release/python-3912/). This can be within an anaconda distribution. 
  
  Ensure you have run a relevent PAMGuard click detector through your data (currently this works for single channel data. Multiple channels can work but will require some editing to the runClass.py). See IGNORE/PAMGuard/clickDetector.psfx for an example working with single channel data sampled at 5xx kHz, resampled to 96 kHz for click detection, with a 10 kHz pre and trigger high pass filter.
