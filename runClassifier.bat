@@ -2,7 +2,7 @@
 
 REM Get directory path
 SET base_file_location=%~dp0
-ECHO Dive Path: %base_file_location%
+ECHO Drive Path: %base_file_location%
 
 REM Ask user to choose a model (1 for 96kHz, 2 for 250kHz)
 ECHO Select model to use:
@@ -37,6 +37,7 @@ echo Python executable: %CONDA_EXE%
 python -c "import sys; print('Python executable:', sys.executable); print('Python version:', sys.version)"
 
 REM Run the Python script with the base file location and model choice as arguments
-python "%base_file_location%runClass.py" "%base_file_location%" "%model_choice%"
+python "%base_file_location%runClass.py" "%model_choice%" "%base_file_location%"
+
 
 pause

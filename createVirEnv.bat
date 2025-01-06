@@ -52,7 +52,7 @@ echo Installing packages from requirements.txt...
 REM Check if requirements.txt exists and install packages
 if exist "requirements.txt" (
     echo Installing packages...
-    pip install -r requirements.txt >> install_log.txt 2>&1
+    pip install -r requirements.txt 2>&1
     if errorlevel 1 (
         echo Failed to install packages from requirements.txt. If you encounter "Access is denied" errors, try running the batch file as Administrator.
         echo Please right-click the batch file and select "Run as Administrator" to install the packages.

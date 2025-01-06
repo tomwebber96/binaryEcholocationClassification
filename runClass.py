@@ -55,8 +55,7 @@ def round_to_nearest_5_minutes(dt):
         dt += timedelta(minutes=5)
     return dt
 
-# pad data
-max_length = 64
+
 
 def pad_waveforms(data, max_length):
     padded_waveforms = []
@@ -129,25 +128,32 @@ def main(base_file_location, model_choice):
     # Load model
 
     if model_choice == "96kHz":
-    	modelLocation = os.path.join(base_file_location, "models/96_binaryPadded.h5")
+    	modelLocation = os.path.join(base_file_location, "models", "96_binaryPadded.h5")
     elif model_choice == "250kHz":
-    	modelLocation = os.path.join(base_file_location, "models/250_binaryPadded.h5")
+    	modelLocation = os.path.join(base_file_location, "models", "250_binaryPadded.h5")
     else:
-    	print("Invalid model choice: {model_choice}")
+    	print(f"Invalid model choice: {model_choice}")
     	return
+
+    if model_choice == "96kHz":
+    	max_length = 64
+    elif model_choice == "250kHz":
+    	max_length = 128
+    	return
+
     
     # Debugging: Print the model path to check if it's correct
-    print(f"Attempting to load model from: {model_location}")
+    print(f"Attempting to load model from: {modelLocation}")
     
     # Check if the model path exists
-    if not os.path.exists(model_location):
-        print(f"Error: The model file cannot be found: {model_location}")
+    if not os.path.exists(modelLocation):
+        print(f"Error: The model file cannot be found: {modelLocation}")
         return
 
     # Load the model if the path is valid
     try:
-        model = load_model(model_location)
-        print(f"Model loaded successfully from: {model_location}")
+        model = load_model(modelLocation)
+        print(f"Model loaded successfully from: {modelLocation}")
     except Exception as e:
         print(f"Error loading the model: {e}")
         return
@@ -313,11 +319,19 @@ def main(base_file_location, model_choice):
             log_file.flush()  # Ensure log entry is written to file
 
 # The entry point of the script
+
 if __name__ == "__main__":
+    base_file_location = sys.argv[2].strip('"')
+    #base_file_location = f'"{base_file_location}"'
+    print(base_file_location)
+    model_choice = sys.argv[1].strip('"')
+    #model_choice = f'"{model_choice}"'
+    print(model_choice)
+        
     if len(sys.argv) < 3:
-        print("Please provide the base file location and model choice (96kHz or 250kHz).")
-    else:
-        base_file_location = sys.argv[1]
-        model_choice = sys.argv[2]
-        main(base_file_location, model_choice)
+    	print("Error: Missing required arguments.")
+    	print("Usage: python runClass.py <base_file_location> <model_choice>")
+    	sys.exit(1)
+
+    main(base_file_location, model_choice)
 
