@@ -1,6 +1,6 @@
 # Binary Echolocation Classification
 
-[(logo.png)]
+![image](logo.png)
 
 
 ## Short Summary Here
