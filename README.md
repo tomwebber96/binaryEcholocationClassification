@@ -1,5 +1,7 @@
 # Binary Echolocation Classification
 
+# UPDATING . . .
+
 ![image](logo.png)
 
 *Created with DALL·E: "Deep learning classifier for dolphin echolocation".*
