@@ -13,7 +13,9 @@ import tensorflow as tf
 import numpy as np
 import csv
 import shutil
+import h5py, json
 from keras.models import load_model
+from tensorflow.keras.models import model_from_json
 from scipy.io import savemat, loadmat
 from datetime import datetime, timedelta
 
@@ -145,12 +147,13 @@ def main(base_file_location, model_choice):
     # Debugging: Print the model path to check if it's correct
     print(f"Attempting to load model from: {modelLocation}")
     
+    model = None 
+
     # Check if the model path exists
     if not os.path.exists(modelLocation):
         print(f"Error: The model file cannot be found: {modelLocation}")
         return
 
-    # Load the model if the path is valid
     try:
         model = load_model(modelLocation)
         print(f"Model loaded successfully from: {modelLocation}")
@@ -160,6 +163,7 @@ def main(base_file_location, model_choice):
     
     model = load_model(modelLocation)
 
+    
     # Load sites (folders, and remove non-site folders)
     exclude_dirs = ['models', '$RECYCLE.BIN', 'System Volume Information', 'Cuda', 'Gg_env', 'overlappingWAVs', 'IGNORE']
     sites = [f for f in os.listdir(base_file_location) 
@@ -185,6 +189,8 @@ def main(base_file_location, model_choice):
     
             csv_file_path = os.path.join(site_path, f'{site}_recordingClass.csv')
             complete_csv_file_path = os.path.join(site_path, f'{site}_recordingClass_complete.csv')
+            drive_csv_file_path = 'C:/Users/phdtw01/OneDrive - SAMS/PhD/3. Data processing/6.deepLearning/CSE/'
+            onedrive_csv_file_path = os.path.join(drive_csv_file_path, f'{site}_recordingClass_complete.csv')
     
             if os.path.isfile(complete_csv_file_path):
                 print(f"Skipping site {site} as {complete_csv_file_path} already exists.")
@@ -309,6 +315,7 @@ def main(base_file_location, model_choice):
         
                 # After processing all daily folders, save the complete CSV file
                 shutil.copy(csv_file_path, complete_csv_file_path)
+                shutil.copy(csv_file_path, onedrive_csv_file_path)
                 print(f"CSV file saved as: {complete_csv_file_path}")
 
             # Log the site summary
