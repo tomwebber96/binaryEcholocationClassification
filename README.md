@@ -16,14 +16,19 @@ Within the deep learning module, direct PAMGuard to the 96kHz_PB_model.zip. PAMG
  
 Outputs will be stored in PAMGuard's deep learning .pgdf's. It is recommended to use a mean classification score over a given time bin with thresholds tested for each use case.
  
-## Running from a windows .bat file (UPDATING FOLLOWING PY for PAMGuard)
-The .h5 models used within the .bat file approach were last trained using python 3.10.10. The specific LSTMs within these models were last supported with Tensorflow 2.17. This version of tensorflow is not supported after Python 3.12. 
+## Running from a windows .bat file
+The .h5 models used within the .bat file approach were last trained using python 3.10.10. The specific LSTMs within these models were last supported with Tensorflow 2.16.1. This version of tensorflow is not supported after Python 3.12. 
 
-Ensure you have a python installation (3.9.12 - tested and working - https://www.python.org/downloads/release/python-3912/). This can be within an anaconda distribution. CURRENTLY TESTING ON PYTHON 3.12.
+Ensure you have a python installation (3.12.0 - tested and working). This can be within an anaconda distribution. 
  
 Ensure you have run a relevent PAMGuard click detector through your data (currently this works for single channel data. Multiple channels can work but will require some editing to the runClass.py). See IGNORE/PAMGuard/clickDetector.psfx for an example working with single channel data sampled at 500 kHz, resampled to 96 kHz for click detection, with a 10 kHz pre and trigger high pass filter.
- 
+
+### For storing individual predictions:
+Currently to store individual predictions, .pgdf's must be saved as .mat files, which are processed, and new .mat files saved with normalized waveforms and predictions.
 Generate .mat file copies of .pgdf's. See IGNORE/pgdf_to_mat.m - UPDATTING TO PULL .PGDFs INTO .PY WITHOUT .m SCRIPT
+
+### For predicting off .pgdf's directly:
+Use the batch script *runClassifier_PGDF* to work from .pgdf's directly without the need for converting to .mat files. Currently no logging of individual predictions is supported. Updates may take place which will aim to produce files that store normalized waveforms with predictions.
  
 Clone this binaryClickClassifier repo and copy in the processed PAMGuard data such that it exists in a subfolder e.g. Site_data with the subfolder "binary" containing daily folders of .mat files. Many different sites can be run simultaneously, simply compy the below structure for each site within the parent directory.
  ```
