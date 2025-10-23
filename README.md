@@ -25,10 +25,10 @@ Ensure you have run a relevent PAMGuard click detector through your data (curren
 
 ### For storing individual predictions:
 Currently to store individual predictions, .pgdf's must be saved as .mat files, which are processed, and new .mat files saved with normalized waveforms and predictions.
-Generate .mat file copies of .pgdf's. See IGNORE/pgdf_to_mat.m - UPDATTING TO PULL .PGDFs INTO .PY WITHOUT .m SCRIPT
+Generate .mat file copies of .pgdf's. See IGNORE/pgdf_to_mat.m
 
 ### For predicting off .pgdf's directly:
-Use the batch script *runClassifier_PGDF* to work from .pgdf's directly without the need for converting to .mat files. Currently no logging of individual predictions is supported. Updates may take place which will aim to produce files that store normalized waveforms with predictions.
+Use the batch script *runClassifier_PGDF* to work from .pgdf's directly without the need for converting to .mat files. Currently no logging of individual predictions is supported. Some pypamguard warning do appear but this doesnt affect predictions or storing 5 min bins in the .csv. Updates may take place which will aim to produce files that store normalized waveforms with predictions.
  
 Clone this binaryClickClassifier repo and copy in the processed PAMGuard data such that it exists in a subfolder e.g. Site_data with the subfolder "binary" containing daily folders of .mat files. Many different sites can be run simultaneously, simply compy the below structure for each site within the parent directory.
  ```
