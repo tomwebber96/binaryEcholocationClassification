@@ -49,13 +49,16 @@ def matlab_datenum_to_datetime(datenum):
     """Convert MATLAB datenum into a Python datetime object."""
     return datetime.fromordinal(int(datenum)) + timedelta(days=datenum % 1) - timedelta(days=366)
 
-# Round time to the nearest 5-minute interval
-def round_to_nearest_5_minutes(dt):
-    discard = timedelta(minutes=dt.minute % 5, seconds=dt.second, microseconds=dt.microsecond)
-    dt -= discard
-    if discard >= timedelta(minutes=2.5):
-        dt += timedelta(minutes=5)
-    return dt
+# Round time down to the nearest 5-minute interval - i.e. 5 min time chunk is start of time chunk- 00:04:59 to 00:00:00
+def round_down_to_nearest_5_minutes(dt):
+    # Calculate minutes past the last 5-minute mark
+    discard = timedelta(
+        minutes=dt.minute % 5,
+        seconds=dt.second,
+        microseconds=dt.microsecond
+    )
+    # Simply subtract the extra time to round down
+    return dt - discard
 
 
 
@@ -341,4 +344,5 @@ if __name__ == "__main__":
     	sys.exit(1)
 
     main(base_file_location, model_choice)
+
 
