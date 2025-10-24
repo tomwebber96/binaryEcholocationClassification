@@ -19,18 +19,11 @@ Outputs will be stored in PAMGuard's deep learning .pgdf's. It is recommended to
 ## Running from a windows .bat file
 The .h5 models used within the .bat file approach were last trained using python 3.10.10. The specific LSTMs within these models were last supported with Tensorflow 2.16.1. This version of tensorflow is not supported after Python 3.12. 
 
-Ensure you have a python installation (3.12.0 - tested and working). This can be within an anaconda distribution. 
+Ensure you have a python installation (3.12.0 - tested and working - https://www.python.org/downloads/release/python-3120/). This can be within an anaconda distribution. 
  
 Ensure you have run a relevent PAMGuard click detector through your data (currently this works for single channel data. Multiple channels can work but will require some editing to the runClass.py). See IGNORE/PAMGuard/clickDetector.psfx for an example working with single channel data sampled at 500 kHz, resampled to 96 kHz for click detection, with a 10 kHz pre and trigger high pass filter.
 
-### For storing individual predictions:
-Currently to store individual predictions, .pgdf's must be saved as .mat files, which are processed, and new .mat files saved with normalized waveforms and predictions.
-Generate .mat file copies of .pgdf's. See IGNORE/pgdf_to_mat.m
-
-### For predicting off .pgdf's directly:
-Use the batch script *runClassifier_PGDF* to work from .pgdf's directly without the need for converting to .mat files. Currently no logging of individual predictions is supported. Some pypamguard warning do appear but this doesnt affect predictions or storing 5 min bins in the .csv. Updates may take place which will aim to produce files that store normalized waveforms with predictions.
- 
-Clone this binaryClickClassifier repo and copy in the processed PAMGuard data such that it exists in a subfolder e.g. Site_data with the subfolder "binary" containing daily folders of .mat files. Many different sites can be run simultaneously, simply compy the below structure for each site within the parent directory.
+Clone this binaryClickClassifier repo and copy in the processed PAMGuard data such that it exists in a subfolder e.g. Site_data with the subfolder "binary" containing daily folders of .mat/ .pgdf files. Many different sites can be run simultaneously, simply compy the below structure for each site within the parent directory.
  ```
  └── binaryClickClassifier /
     ├── Site_name/
@@ -41,8 +34,16 @@ Clone this binaryClickClassifier repo and copy in the processed PAMGuard data su
 ```
 
 Next, run createVirEnv.bat. It will ask to be directed to your python installation. If unsure run *where python* in cmd or your anaconda installation. Python's Pip installation may require admin rights. 
+
+### For storing individual predictions:
+Currently to store individual predictions, .pgdf's must be saved as .mat files, which are processed, and new .mat files saved with normalized waveforms and predictions.
+Generate .mat file copies of .pgdf's. See IGNORE/pgdf_to_mat.m
+
+### For predicting off .pgdf's directly:
+Use the batch script *runClassifier_PGDF* to work from .pgdf's directly without the need for converting to .mat files. Currently no logging of individual predictions is supported. Some pypamguard warning do appear but this doesnt affect predictions or storing 5 min bins in the .csv. Updates may take place which will aim to produce files that store normalized waveforms with predictions.
  
-runClassifer.bat will then ask for which model you want to select, 96kHz or 250kHz. Select option 1 or 2. Any errors should become obvious and most likely due to the python installation on the system.
+
+Run either the runClassifer.bat (for .mat files with individual predictions output) or the runClassifier_PGDF (for bypassing need for creating .mat files). It will ask for which model you want to select, 96kHz or 250kHz. Select option 1 or 2. Any errors should become obvious and most likely due to the python installation on the system.
  
 The .bat file will create a new folder called classified with a copy of the .mat files with the suffix_classified, containing a normalised copy of the waveforms and individual prediction scores. It will also generate a .csv file with a mean classification score in 5-minute time bins.
  
