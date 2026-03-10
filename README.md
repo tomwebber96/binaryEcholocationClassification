@@ -17,7 +17,7 @@ Within the deep learning module, direct PAMGuard to the 96kHz_PB_model.zip. PAMG
 Outputs will be stored in PAMGuard's deep learning .pgdf's. It is recommended to use a mean classification score over a given time bin with thresholds tested for each use case.
  
 ## Running from a windows .bat file
-The .h5 models used within the .bat file approach were last trained using python 3.10.10. The specific LSTMs within these models were last supported with Tensorflow 2.16.1. This version of tensorflow is not supported after Python 3.12. 
+The .h5 models used within the .bat file approach were last trained using python 3.10.10. The specific LSTMs within these models were last supported with Tensorflow 2.12.0. This version of tensorflow is not supported after Python 3.12. 
 
 Ensure you have a python installation (3.12.0 - tested and working - https://www.python.org/downloads/release/python-3120/). This can be within an anaconda distribution. 
  
@@ -33,7 +33,7 @@ Clone this binaryClickClassifier repo and copy in the processed PAMGuard data su
     │   │       ├── Click_Detector_Click_Detector_Clicks_20240106_010000.mat
 ```
 
-Next, run createVirEnv.bat. It will ask to be directed to your python installation. If unsure run *where python* in cmd or your anaconda installation. Python's Pip installation may require admin rights. 
+Next, run createVirEnv.bat. It will ask to be directed to your python installation. If unsure run *where python* in cmd or your anaconda installation. Python's Pip installation may require admin rights. The .bat file will also ask if you wish to install CUDA ([11.8] https://developer.nvidia.com/cuda-11-8-0-download-archive) and cuDNN ([8.6] https://developer.nvidia.com/rdp/cudnn-archive) which are required to use NVidia GPUs. If another GPU is installed, further installs maybe required for your specific use case.
 
 ### For storing individual predictions:
 Currently to store individual predictions, .pgdf's must be saved as .mat files, which are processed, and new .mat files saved with normalized waveforms and predictions.
