@@ -15,13 +15,19 @@ import numpy as np
 import csv
 import shutil
 import h5py, json
-import pypamguard
 import logging
 import warnings
+
+
+import datetime
+if not hasattr(datetime, 'UTC'):
+    datetime.UTC = datetime.timezone.utc
+
 from keras.models import load_model
 from tensorflow.keras.models import model_from_json
 from scipy.io import savemat, loadmat
-from datetime import datetime, timedelta
+from datetime import datetime as dt, timedelta
+import pypamguard
 
 sys.stderr = open(os.devnull, 'w')
 logging.getLogger('pypamguard').setLevel(logging.ERROR)
@@ -50,7 +56,7 @@ def get_last_entry_date(csv_file_path):
         for row in reader:
             try:
                 # Use %z to handle timezone in the datetime string
-                datetime_obj = datetime.strptime(row[0], '%Y-%m-%d %H:%M:%S%z').date()
+                datetime_obj = dt.strptime(row[0], '%Y-%m-%d %H:%M:%S%z').date()
                 if last_date is None or datetime_obj > last_date:
                     last_date = datetime_obj
             except ValueError as e:
@@ -70,7 +76,7 @@ def convert_datetime_to_timestamp(click_detector_obj):
 
 
 # Round time down to the nearest 5-minute interval - i.e. 5 min time chunk is start of time chunk- 00:04:59 to 00:00:00
-def round_down_to_nearest_5_minutes(dt):
+def round_to_nearest_5_minutes(dt):
     # Calculate minutes past the last 5-minute mark
     discard = timedelta(
         minutes=dt.minute % 5,
@@ -158,7 +164,7 @@ def main(base_file_location, model_choice):
     	max_length = 64
     elif model_choice == "250kHz":
     	max_length = 128
-    	return
+    	
 
     
     # Debugging: Print the model path to check if it's correct
@@ -172,13 +178,13 @@ def main(base_file_location, model_choice):
         return
 
     try:
-        model = load_model(modelLocation)
+        model = load_model(modelLocation, compile=False, custom_objects={})
         print(f"Model loaded successfully from: {modelLocation}")
     except Exception as e:
         print(f"Error loading the model: {e}")
         return
     
-    model = load_model(modelLocation)
+    #model = load_model(modelLocation, compile=False, custom_objects={})
 
     
     # Load sites (folders, and remove non-site folders)
@@ -194,7 +200,7 @@ def main(base_file_location, model_choice):
         # Main loop    
         for site in sites:
             site_path = os.path.join(base_file_location, site)
-            log_file.write(f"Starting Site: {site} at {datetime.now()}\n")
+            log_file.write(f"Starting Site: {site} at {dt.now()}\n")
             print("Loading Site:", site)
             
             total_waveforms = 0
@@ -235,7 +241,7 @@ def main(base_file_location, model_choice):
                     # Check if it is a directory
                     if os.path.isdir(daily_folder_path):
                         folder_date_str = daily_folder[:8]
-                        folder_date = datetime.strptime(folder_date_str, '%Y%m%d')
+                        folder_date = dt.strptime(folder_date_str, '%Y%m%d')
                         
                         if 'last_entry_date' in locals():
                             if last_entry_date and folder_date.date() < last_entry_date:
@@ -250,35 +256,35 @@ def main(base_file_location, model_choice):
                         
                         # List all .mat files in the daily folder
                         for file in os.listdir(daily_folder_path):
-                            if file.endswith('.pgdf') and 'Click_Detector_Click_Detector' in file:
+                            if file.endswith('.pgdf') and 'Click_Detector_Click_Detector_Clicks' in file:
                                 pgdf_file_count += 1
                                 pgdf_file_path = os.path.join(daily_folder_path, file)
                                 try:
-                                    # Load the .pgdf file
-                                                                    
+                                    # Load the .pgdf file                                                            
+                                    
                                     pgdf_file = pypamguard.load_pamguard_binary_file(pgdf_file_path)
+                                    if pgdf_file is None or pgdf_file.data is None:
+                                         print(f"Warning: Could not load or empty data in {pgdf_file_path}, skipping.")
                                     pgdf_data_object = pgdf_file.data
                                     pgdf_data = np.array(pgdf_data_object)
-                                    pgdf_data = pgdf_data.reshape(1, -1)    
+                                    pgdf_data.reshape(1, -1)    
                                     
                                    
                                     # Extract the start time from the first waveform
                                     
                                     obj = pgdf_data[0]
-                                    start_time_num = obj[0].date
+                                    start_time_num = obj.date
 
                                     
                                     process_start_time = start_time_num
                                     print(f"{file}: {process_start_time}")
 
                                     waveform_list = []
-
-                                    for i in range(pgdf_data.shape[1]):
-                                        obj = pgdf_data[0,i]
-                                        waveform = obj.wave
+                                    for obj in pgdf_data:
+                                        waveform = obj.wave.flatten()
                                         waveform = waveform.reshape(-1, 1)
-                                        waveform_time_num_pgdf= obj.date
-                                        waveform_list.append((waveform, waveform_time_num_pgdf))
+                                        waveform_time = obj.date
+                                        waveform_list.append((waveform, waveform_time))
                                                                             
                                     waveform_array = np.array([item[0] for item in waveform_list], dtype=object)
                                     normalized_waveforms = [normalize_waveform(waveform) for waveform in waveform_array]
