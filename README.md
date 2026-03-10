@@ -17,9 +17,9 @@ Within the deep learning module, direct PAMGuard to the 96kHz_PB_model.zip. PAMG
 Outputs will be stored in PAMGuard's deep learning .pgdf's. It is recommended to use a mean classification score over a given time bin with thresholds tested for each use case.
  
 ## Running from a windows .bat file
-The .h5 models used within the .bat file approach were last trained using python 3.10.10. The specific LSTMs within these models were last supported with Tensorflow 2.12.0. This version of tensorflow is not supported after Python 3.12. 
+The .h5 models used within the .bat file approach were last trained using python 3.10.10. The specific LSTMs within these models were last supported with Tensorflow 2.12.0. This version of tensorflow is not supported after Python 3.12. For native GPU support in windows, Tensorflow must be 2.10 or older, as such, python 3.10 is the most recent which will support this tensorflow version.
 
-Ensure you have a python installation (3.12.0 - tested and working - https://www.python.org/downloads/release/python-3120/). This can be within an anaconda distribution. 
+Ensure you have a python installation (3.10.0 - tested and working - https://www.python.org/downloads/release/python-3120/). This can be within an anaconda distribution. 
  
 Ensure you have run a relevent PAMGuard click detector through your data (currently this works for single channel data. Multiple channels can work but will require some editing to the runClass.py). See IGNORE/PAMGuard/clickDetector.psfx for an example working with single channel data sampled at 500 kHz, resampled to 96 kHz for click detection, with a 10 kHz pre and trigger high pass filter.
 
