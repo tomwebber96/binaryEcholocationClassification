@@ -29,8 +29,8 @@ Clone this binaryClickClassifier repo and copy in the processed PAMGuard data su
     ├── Site_name/
     │   ├── binary/
     │   │   └── 20240106/
-    │   │       ├── Click_Detector_Click_Detector_Clicks_20240106_000000.mat
-    │   │       ├── Click_Detector_Click_Detector_Clicks_20240106_010000.mat
+    │   │       ├── Click_Detector_Click_Detector_Clicks_20240106_000000.pgdf
+    │   │       ├── Click_Detector_Click_Detector_Clicks_20240106_010000.pgdf
 ```
 
 Next, run createVirEnv.bat. It will ask to be directed to your python installation. If unsure run *where python* in cmd or your anaconda installation. Python's Pip installation may require admin rights. The .bat file will also ask if you wish to install CUDA ([11.8] https://developer.nvidia.com/cuda-11-8-0-download-archive) and cuDNN ([8.6] https://developer.nvidia.com/rdp/cudnn-archive) which are required to use NVidia GPUs. If another GPU is installed, further installs maybe required for your specific use case.
