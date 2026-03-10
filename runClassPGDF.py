@@ -174,30 +174,48 @@ def _pack_chunk_info(length, identifier):
 def write_pgdf_with_predictions(input_path, output_path, pgdf_data, predictions):
     predictions = list(predictions)
     ENDIAN = '>'
-    
-    with open(input_path, 'rb') as fin, open(output_path, 'wb') as fout:
+
+    DATA_FLAG_FIELDS = ['TIMEMILLISECONDS','TIMENANOSECONDS','CHANNELMAP','UID','STARTSAMPLE',
+                        'SAMPLEDURATION','FREQUENCYLIMITS','MILLISDURATION','TIMEDELAYSECONDS',
+                        'HASBINARYANNOTATIONS','HASSEQUENCEMAP','HASNOISE','HASSIGNAL','HASSIGNALEXCESS']
+
+    with open(input_path, 'rb') as fin:
         file_bytes = fin.read()
-    
+
     output = bytearray(file_bytes)
-    
-    # Process in reverse order so offsets don't shift as we insert bytes
-    for i in range(len(pgdf_data) - 1, -1, -1):
-        obj = pgdf_data[i]
-        chunk_info_pos = obj._start_pos - 8  # 8 bytes before body = chunk info header
-        body_end = obj._start_pos + obj._measured_length
-        
-        # Update length field (first INT32 at chunk_info_pos) by +4
-        old_length = struct.unpack_from(f'{ENDIAN}i', output, chunk_info_pos)[0]
-        struct.pack_into(f'{ENDIAN}i', output, chunk_info_pos, old_length + 4)
-        
-        # Append prediction float32 after the chunk body
-        pred_bytes = struct.pack(f'{ENDIAN}f', float(predictions[i]))
-        output = output[:body_end] + pred_bytes + output[body_end:]
-    
+
+    for i, (obj, pred) in enumerate(zip(pgdf_data, predictions)):
+        # Calculate offset of click data start within chunk body
+        pos = 8   # skip millis INT64
+        flags_raw = struct.unpack_from(f'{ENDIAN}H', output, obj._start_pos + 8)[0]
+        pos += 2  # flag_bitmap INT16
+        set_flags = [DATA_FLAG_FIELDS[j] for j in range(len(DATA_FLAG_FIELDS)) if flags_raw & (1 << j)]
+
+        if 'TIMENANOSECONDS' in set_flags: pos += 8
+        if 'CHANNELMAP' in set_flags: pos += 4
+        if 'UID' in set_flags: pos += 8
+        if 'STARTSAMPLE' in set_flags: pos += 8
+        if 'SAMPLEDURATION' in set_flags: pos += 4
+        if 'FREQUENCYLIMITS' in set_flags: pos += 8
+        if 'MILLISDURATION' in set_flags: pos += 4
+        if 'TIMEDELAYSECONDS' in set_flags:
+            n = struct.unpack_from(f'{ENDIAN}h', output, obj._start_pos + pos)[0]
+            pos += 2 + n * 4
+        if 'HASSEQUENCEMAP' in set_flags: pos += 4
+        if 'HASNOISE' in set_flags: pos += 4
+        if 'HASSIGNAL' in set_flags: pos += 4
+        if 'HASSIGNALEXCESS' in set_flags: pos += 4
+        pos += 4  # data_length INT32
+
+        # trigger_map INT32 (4 bytes), then type INT16
+        type_offset = obj._start_pos + pos + 4
+        new_type = np.int16(1) if pred >= 0.5 else np.int16(0)
+        struct.pack_into(f'{ENDIAN}h', output, type_offset, int(new_type))
+
     with open(output_path, 'wb') as fout:
         fout.write(output)
-    
-    print(f"  Written {len(predictions)} predictions to: {output_path}")
+
+    print(f"  Written {len(predictions)} type classifications to: {output_path}")
     
 def main(base_file_location, model_choice, write_predictions=False):
     print(f"The base folder location is: {base_file_location}")
@@ -421,4 +439,5 @@ if __name__ == "__main__":
     print(f"Write predictions to pgdf: {write_predictions}")
 
     main(base_file_location, model_choice, write_predictions)
+
 
