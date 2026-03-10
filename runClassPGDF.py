@@ -34,6 +34,8 @@ logging.getLogger('pypamguard').setLevel(logging.ERROR)
 
 warnings.filterwarnings("ignore", message=".*ChunkLengthMismatch.*")
 
+
+
 # Waveform normalisation
 def normalize_waveform(waveform):
     """Normalize a waveform with mean 0 and std 1."""
@@ -262,7 +264,13 @@ def main(base_file_location, model_choice):
                                 try:
                                     # Load the .pgdf file                                                            
                                     
-                                    pgdf_file = pypamguard.load_pamguard_binary_file(pgdf_file_path)
+                                    with open(os.devnull, 'w') as devnull:
+                                        old_stdout = sys.stdout
+                                        sys.stdout = devnull
+                                        try:
+                                            pgdf_file = pypamguard.load_pamguard_binary_file(pgdf_file_path)
+                                        finally:
+                                            sys.stdout = old_stdout
                                     if pgdf_file is None or pgdf_file.data is None:
                                          print(f"Warning: Could not load or empty data in {pgdf_file_path}, skipping.")
                                     pgdf_data_object = pgdf_file.data
@@ -293,6 +301,10 @@ def main(base_file_location, model_choice):
                                     # Predict using the model
                                     predictions = model.predict(waveforms_norm).flatten().astype(np.float32)
                                     total_waveforms += len(predictions)
+                                    
+                                    n_positive = int(np.sum(predictions >= 0.5))
+                                    n_negative = len(predictions) - n_positive
+                                    print(f"  {file}: {len(predictions)} waveforms → {n_positive} positive, {n_negative} negative ({100*n_positive/len(predictions):.1f}%)")
                                   
                                                                      
                                     # Process each waveform, group into 5-minute intervals
