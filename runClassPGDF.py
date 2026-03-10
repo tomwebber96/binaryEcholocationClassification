@@ -10,6 +10,7 @@ import sys
 import os
 import scipy.io
 import time
+import struct
 import tensorflow as tf
 import numpy as np
 import csv
@@ -17,6 +18,7 @@ import shutil
 import h5py, json
 import logging
 import warnings
+import traceback
 
 
 import datetime
@@ -79,14 +81,13 @@ def convert_datetime_to_timestamp(click_detector_obj):
 
 # Round time down to the nearest 5-minute interval - i.e. 5 min time chunk is start of time chunk- 00:04:59 to 00:00:00
 def round_to_nearest_5_minutes(dt):
-    # Calculate minutes past the last 5-minute mark
     discard = timedelta(
         minutes=dt.minute % 5,
         seconds=dt.second,
         microseconds=dt.microsecond
     )
-    # Simply subtract the extra time to round down
-    return dt - discard
+    rounded = dt - discard
+    return rounded.replace(tzinfo=dt.tzinfo)  # preserve timezone
 
 
 
@@ -136,7 +137,69 @@ def pad_waveforms(data, max_length):
 
     return np.array(padded_waveforms, dtype=np.float32).reshape(-1, max_length, 1), removed_indices
 
-def main(base_file_location, model_choice):
+
+"""
+PAMGuard Binary Writer
+======================
+Creates a new .pgdf file identical to the input, but with a float32
+'prediction' value appended to each data chunk.
+
+Usage:
+    from pamguard_writer import write_pgdf_with_predictions
+
+    write_pgdf_with_predictions(
+        input_path='path/to/input.pgdf',
+        output_path='path/to/output.pgdf',
+        predictions=predictions_array  # 1D numpy array or list, one per detection
+    )
+"""
+
+CHUNK_INFO_SIZE = 8  # INT32 length + INT32 identifier
+ENDIAN = '>'         # PAMGuard default: big-endian
+
+
+def _read_chunk_info(fp):
+    """Read the 8-byte chunk header. Returns (length, identifier) or (None, None) at EOF."""
+    raw = fp.read(CHUNK_INFO_SIZE)
+    if len(raw) < CHUNK_INFO_SIZE:
+        return None, None
+    length, identifier = struct.unpack(f'{ENDIAN}ii', raw)
+    return length, identifier
+
+
+def _pack_chunk_info(length, identifier):
+    """Pack a chunk header to bytes."""
+    return struct.pack(f'{ENDIAN}ii', length, identifier)
+
+def write_pgdf_with_predictions(input_path, output_path, pgdf_data, predictions):
+    predictions = list(predictions)
+    ENDIAN = '>'
+    
+    with open(input_path, 'rb') as fin, open(output_path, 'wb') as fout:
+        file_bytes = fin.read()
+    
+    output = bytearray(file_bytes)
+    
+    # Process in reverse order so offsets don't shift as we insert bytes
+    for i in range(len(pgdf_data) - 1, -1, -1):
+        obj = pgdf_data[i]
+        chunk_info_pos = obj._start_pos - 8  # 8 bytes before body = chunk info header
+        body_end = obj._start_pos + obj._measured_length
+        
+        # Update length field (first INT32 at chunk_info_pos) by +4
+        old_length = struct.unpack_from(f'{ENDIAN}i', output, chunk_info_pos)[0]
+        struct.pack_into(f'{ENDIAN}i', output, chunk_info_pos, old_length + 4)
+        
+        # Append prediction float32 after the chunk body
+        pred_bytes = struct.pack(f'{ENDIAN}f', float(predictions[i]))
+        output = output[:body_end] + pred_bytes + output[body_end:]
+    
+    with open(output_path, 'wb') as fout:
+        fout.write(output)
+    
+    print(f"  Written {len(predictions)} predictions to: {output_path}")
+    
+def main(base_file_location, model_choice, write_predictions=False):
     print(f"The base folder location is: {base_file_location}")
     print(f"Selected model {model_choice}")
 
@@ -153,28 +216,23 @@ def main(base_file_location, model_choice):
     print("Available devices:", devices)
 
     # Load model
-
     if model_choice == "96kHz":
-    	modelLocation = os.path.join(base_file_location, "models", "96_binaryPadded.h5")
+        modelLocation = os.path.join(base_file_location, "models", "96_binaryPadded.h5")
     elif model_choice == "250kHz":
-    	modelLocation = os.path.join(base_file_location, "models", "250_binaryPadded.h5")
+        modelLocation = os.path.join(base_file_location, "models", "250_binaryPadded.h5")
     else:
-    	print(f"Invalid model choice: {model_choice}")
-    	return
+        print(f"Invalid model choice: {model_choice}")
+        return
 
     if model_choice == "96kHz":
-    	max_length = 64
+        max_length = 64
     elif model_choice == "250kHz":
-    	max_length = 128
-    	
+        max_length = 128
 
-    
-    # Debugging: Print the model path to check if it's correct
     print(f"Attempting to load model from: {modelLocation}")
-    
-    model = None 
 
-    # Check if the model path exists
+    model = None
+
     if not os.path.exists(modelLocation):
         print(f"Error: The model file cannot be found: {modelLocation}")
         return
@@ -185,66 +243,63 @@ def main(base_file_location, model_choice):
     except Exception as e:
         print(f"Error loading the model: {e}")
         return
-    
-    #model = load_model(modelLocation, compile=False, custom_objects={})
 
-    
     # Load sites (folders, and remove non-site folders)
     exclude_dirs = ['models', '$RECYCLE.BIN', 'System Volume Information', 'Cuda', 'Gg_env', 'overlappingWAVs', 'IGNORE']
-    sites = [f for f in os.listdir(base_file_location) 
-             if os.path.isdir(os.path.join(base_file_location, f)) 
+    sites = [f for f in os.listdir(base_file_location)
+             if os.path.isdir(os.path.join(base_file_location, f))
              and f.lower() not in (dir_name.lower() for dir_name in exclude_dirs)]
-    
+
     log_file_path = os.path.join(base_file_location, 'processing_log.txt')
     print("Logging:", log_file_path)
     with open(log_file_path, 'a') as log_file:
 
-        # Main loop    
+        # Main loop
         for site in sites:
             site_path = os.path.join(base_file_location, site)
             log_file.write(f"Starting Site: {site} at {dt.now()}\n")
             print("Loading Site:", site)
-            
+
             total_waveforms = 0
             pgdf_file_count = 0
-    
+
             # Clear last entry date variable
             if 'last_entry_date' in locals():
                 del last_entry_date
-    
+
             csv_file_path = os.path.join(site_path, f'{site}_recordingClass.csv')
             complete_csv_file_path = os.path.join(site_path, f'{site}_recordingClass_complete.csv')
-    
+
             if os.path.isfile(complete_csv_file_path):
                 print(f"Skipping site {site} as {complete_csv_file_path} already exists.")
-                continue  # Skip to the next site if the complete file is present
-    
+                continue
+
             if os.path.isfile(csv_file_path):
                 last_entry_date = get_last_entry_date(csv_file_path)
                 print(f"Starting from {last_entry_date}.")
             else:
-                with open(csv_file_path, mode='w', newline='') as file:
-                    writer = csv.writer(file)
+                with open(csv_file_path, mode='w', newline='') as csv_file:
+                    writer = csv.writer(csv_file)
                     writer.writerow(['datetime_obj', 'meanClass', 'nClicks', 'nPositive', 'nNegative'])
-    
+
             # Construct the path to the 'binary' folder within the site
             binary_folder_path = os.path.join(site_path, 'binary')
-            
+
             classified_folder_path = os.path.join(site_path, 'classified')
             if not os.path.exists(classified_folder_path):
                 os.makedirs(classified_folder_path)
-    
+
             # Check if the 'binary' folder exists
             if os.path.exists(binary_folder_path) and os.path.isdir(binary_folder_path):
                 # Iterate through all daily folders in the 'binary' directory
                 for daily_folder in os.listdir(binary_folder_path):
                     daily_folder_path = os.path.join(binary_folder_path, daily_folder)
-    
+
                     # Check if it is a directory
                     if os.path.isdir(daily_folder_path):
                         folder_date_str = daily_folder[:8]
                         folder_date = dt.strptime(folder_date_str, '%Y%m%d')
-                        
+
                         if 'last_entry_date' in locals():
                             if last_entry_date and folder_date.date() < last_entry_date:
                                 print(f"Skipping folder {daily_folder_path} as it is before the last recorded date.")
@@ -255,15 +310,14 @@ def main(base_file_location, model_choice):
 
                         # Initialize storage for the 5-minute bins
                         bin_data = {}
-                        
-                        # List all .mat files in the daily folder
+
+                        # List all .pgdf files in the daily folder
                         for file in os.listdir(daily_folder_path):
                             if file.endswith('.pgdf') and 'Click_Detector_Click_Detector_Clicks' in file:
                                 pgdf_file_count += 1
-                                pgdf_file_path = os.path.join(daily_folder_path, file)
+                                pgdf_file_path = os.path.abspath(os.path.join(daily_folder_path, file))
                                 try:
-                                    # Load the .pgdf file                                                            
-                                    
+                                    # Load the .pgdf file
                                     with open(os.devnull, 'w') as devnull:
                                         old_stdout = sys.stdout
                                         sys.stdout = devnull
@@ -271,21 +325,14 @@ def main(base_file_location, model_choice):
                                             pgdf_file = pypamguard.load_pamguard_binary_file(pgdf_file_path)
                                         finally:
                                             sys.stdout = old_stdout
-                                    if pgdf_file is None or pgdf_file.data is None:
-                                         print(f"Warning: Could not load or empty data in {pgdf_file_path}, skipping.")
-                                    pgdf_data_object = pgdf_file.data
-                                    pgdf_data = np.array(pgdf_data_object)
-                                    pgdf_data.reshape(1, -1)    
-                                    
-                                   
-                                    # Extract the start time from the first waveform
-                                    
-                                    obj = pgdf_data[0]
-                                    start_time_num = obj.date
 
-                                    
-                                    process_start_time = start_time_num
-                                    print(f"{file}: {process_start_time}")
+                                    if pgdf_file is None or pgdf_file.data is None:
+                                        print(f"Warning: Could not load or empty data in {pgdf_file_path}, skipping.")
+                                        continue
+
+                                    pgdf_data = np.array(pgdf_file.data)
+
+                                    print(f"{file}:")
 
                                     waveform_list = []
                                     for obj in pgdf_data:
@@ -293,7 +340,7 @@ def main(base_file_location, model_choice):
                                         waveform = waveform.reshape(-1, 1)
                                         waveform_time = obj.date
                                         waveform_list.append((waveform, waveform_time))
-                                                                            
+
                                     waveform_array = np.array([item[0] for item in waveform_list], dtype=object)
                                     normalized_waveforms = [normalize_waveform(waveform) for waveform in waveform_array]
                                     waveforms_norm = pad_waveforms(np.array(normalized_waveforms, dtype=object), max_length)[0]
@@ -301,12 +348,19 @@ def main(base_file_location, model_choice):
                                     # Predict using the model
                                     predictions = model.predict(waveforms_norm).flatten().astype(np.float32)
                                     total_waveforms += len(predictions)
-                                    
+
                                     n_positive = int(np.sum(predictions >= 0.5))
                                     n_negative = len(predictions) - n_positive
-                                    print(f"  {file}: {len(predictions)} waveforms → {n_positive} positive, {n_negative} negative ({100*n_positive/len(predictions):.1f}%)")
-                                  
-                                                                     
+                                    print(f"  {len(predictions)} waveforms → {n_positive} positive, {n_negative} negative ({100*n_positive/len(predictions):.1f}%)")
+
+                                    # Write new pgdf with predictions into classified/yyyymmdd/
+                                    if write_predictions:
+                                        classified_daily_folder = os.path.abspath(os.path.join(classified_folder_path, daily_folder))
+                                        if not os.path.exists(classified_daily_folder):
+                                            os.makedirs(classified_daily_folder)
+                                        output_pgdf_path = os.path.abspath(os.path.join(classified_daily_folder, file))
+                                        write_pgdf_with_predictions(pgdf_file_path, output_pgdf_path, pgdf_data, predictions)
+
                                     # Process each waveform, group into 5-minute intervals
                                     for (waveform, waveform_time), prediction in zip(waveform_list, predictions):
                                         bin_time = round_to_nearest_5_minutes(waveform_time)
@@ -319,53 +373,52 @@ def main(base_file_location, model_choice):
                                                 'predictions': []
                                             }
 
-                                        # Aggregate data in the current bin
                                         bin_data[bin_time]['nClicks'] += 1
                                         bin_data[bin_time]['nPositive'] += 1 if prediction >= 0.5 else 0
                                         bin_data[bin_time]['nNegative'] += 1 if prediction < 0.5 else 0
                                         bin_data[bin_time]['predictions'].append(prediction)
 
                                 except Exception as e:
-                                    num_waveforms = clkstruct.shape[1] if 'clkstruct' in locals() else 'unknown'
+                                    traceback.print_exc()
                                     print(f"Error processing file {pgdf_file_path}: {e}")
-                                    print(f"Number of waveforms in the structure: {num_waveforms}")
 
-                        # After processing the waveforms, write data for each 5-minute bin to the CSV
-                        with open(csv_file_path, mode='a', newline='') as file:
-                            writer = csv.writer(file)
+                        # After processing all files in daily folder, write 5-minute bins to CSV
+                        with open(csv_file_path, mode='a', newline='') as csv_file:
+                            writer = csv.writer(csv_file)
                             for bin_time, data in sorted(bin_data.items()):
                                 meanClass = np.mean(data['predictions'])
                                 writer.writerow([bin_time, meanClass, data['nClicks'], data['nPositive'], data['nNegative']])
 
+                        print(f"  Written {len(bin_data)} 5-minute bins to CSV")
                         iteration_time = time.time() - start_time
-                        print(f"Classification for daily folder took {iteration_time:.4f} seconds")
-        
+                        print(f"  Classification for daily folder took {iteration_time:.4f} seconds")
+
                 # After processing all daily folders, save the complete CSV file
                 shutil.copy(csv_file_path, complete_csv_file_path)
-                shutil.copy(csv_file_path, onedrive_csv_file_path)
                 print(f"CSV file saved as: {complete_csv_file_path}")
 
             # Log the site summary
-            log_file.write(f"Finished Site: {site} at {datetime.now()}\n")
+            log_file.write(f"Finished Site: {site} at {dt.now()}\n")
             log_file.write(f"Total .pgdf files processed: {pgdf_file_count}\n")
             log_file.write(f"Total waveforms processed: {total_waveforms}\n")
             log_file.write("--------------------------------------------------\n")
-            log_file.flush()  # Ensure log entry is written to file
+            log_file.flush()
 
 # The entry point of the script
 
 if __name__ == "__main__":
-    base_file_location = sys.argv[2].strip('"')
-    #base_file_location = f'"{base_file_location}"'
-    print(base_file_location)
-    model_choice = sys.argv[1].strip('"')
-    #model_choice = f'"{model_choice}"'
-    print(model_choice)
-        
     if len(sys.argv) < 3:
-    	print("Error: Missing required arguments.")
-    	print("Usage: python runClass.py <base_file_location> <model_choice>")
-    	sys.exit(1)
+        print("Error: Missing required arguments.")
+        print("Usage: python runClass.py <model_choice> <base_file_location> <write_predictions>")
+        sys.exit(1)
 
-    main(base_file_location, model_choice)
+    model_choice = sys.argv[1].strip('"')
+    base_file_location = sys.argv[2].strip('"')
+    write_predictions = sys.argv[3].strip('"').lower() == 'yes' if len(sys.argv) > 3 else False
+
+    print(base_file_location)
+    print(model_choice)
+    print(f"Write predictions to pgdf: {write_predictions}")
+
+    main(base_file_location, model_choice, write_predictions)
 
