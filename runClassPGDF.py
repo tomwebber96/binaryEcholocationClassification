@@ -343,9 +343,21 @@ def main(base_file_location, model_choice, signal_excess_choice, write_predictio
                                     waveforms_norm, removed, clipped_waves = pad_waveforms(
                                         normalized, max_length)
 
-                                    preds_subset = run_inference(model, waveforms_norm).astype(np.float32)
+                                    batch_size = 128  # adjust down if still OOM, e.g. 256 or 128
 
-                                    full_preds = np.full(len(pgdf_data), np.nan, dtype=np.float32)
+                                    all_preds  = []
+                                    n_batches  = (len(waveforms_norm) + batch_size - 1) // batch_size
+
+                                    for b, start in enumerate(range(0, len(waveforms_norm), batch_size)):
+                                        batch     = waveforms_norm[start:start + batch_size]
+                                        batch_out = run_inference(model, batch)
+                                        all_preds.append(batch_out)
+                                        n_done = min(start + batch_size, len(waveforms_norm))
+                                        print(f"  Classifying: batch {b+1}/{n_batches} ({n_done}/{len(waveforms_norm)} clicks)", end='\r')
+
+                                    print()
+                                    preds_subset = np.concatenate(all_preds).astype(np.float32)
+                                    full_preds   = np.full(len(pgdf_data), np.nan, dtype=np.float32)
                                     full_preds[mask] = preds_subset
                                     return full_preds, original_waves, clipped_waves
 
