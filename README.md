@@ -15,6 +15,8 @@ First clone this binaryClickClassifier repository. Within /IGNORE/PAMGuard/ is a
 Within the deep learning module, direct PAMGuard to the 96kHz_PB_model.zip. PAMGuard will automatically select the correct settings for the model. A 250kHz_PB_model.zip is available but is mostly untested.
  
 Outputs will be stored in PAMGuard's deep learning .pgdf's. It is recommended to use a mean classification score over a given time bin with thresholds tested for each use case. See PAMGuard help (https://www.pamguard.org/olhelp/utilities/BinaryStore/docs/matlabandr.html) for opening binary files for further data analysis.
+
+Differences in exact prediction scores can occasioanlly occur between running in PAMGuard and the .bat file. These are typically <0.001, but in the cases of waveforms which are shorter than 64 samples (96 kHz model) or 128 (250 kHz model), the centering and padding methods differ slightly. Mean difference of 0.001 tested over 1000 click waveforms.
  
 ## Running from a windows .bat file
 The .h5 models used within the .bat file approach were last trained using python 3.10.10. The specific LSTMs within these models were last supported with Tensorflow 2.12.0. This version of tensorflow is not supported after Python 3.12. For native GPU support in windows, Tensorflow must be 2.10 or older, as such, python 3.10 is the most recent which will support this tensorflow version. GPU compatiability has been tested on an NVIDA CUDA enabled GPU only, requiring CUDA 11.7 (https://developer.nvidia.com/cuda-11-7-0-download-archive) and cuDNN libraries 8.9 (https://developer.nvidia.com/rdp/cudnn-archive). This may differ depending on your GPU. See https://developer.nvidia.com/cudnn#section-how-cudnn-works for help.
