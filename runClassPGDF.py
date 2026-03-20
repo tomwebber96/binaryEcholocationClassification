@@ -72,13 +72,14 @@ def normalize_waveform(waveform):
 def pad_waveforms(data, max_length):
     """
     Peak trim / pad to max_length — matches PAMGuard's cutOrPadWaveform:
-      - If longer: centre on peak, pad RIGHT only if window goes past end
-      - If shorter: centre peak at max_length//2, pad right only (no left-shift)
+      - Peak is placed at max_length//2 (sample 64 for max_length=128)
+      - Pads with zeros where signal is unavailable
     Normalisation is applied BEFORE this function, matching PAMGuard's order.
     """
     padded_waveforms  = []
     clipped_waveforms = []
     removed_indices   = []
+    half = max_length // 2  # 64 for max_length=128
 
     for idx, waveform in enumerate(data):
         try:
@@ -93,37 +94,37 @@ def pad_waveforms(data, max_length):
             removed_indices.append(idx)
             continue
 
-        current_length = len(waveform)
+        # ---- Peak detection ----
+        max_index = np.argmax(waveform)
 
-        if current_length > max_length:
-            # PAMGuard: centre on peak, take what's available, pad RIGHT only
-            max_index   = np.argmax(waveform)
-            start_index = max(0, max_index - max_length // 2)
-            end_index   = min(current_length, start_index + max_length)
-            padded_waveform = waveform[start_index:end_index]
-            # pad right if still short (peak near end) — PAMGuard pads right, does NOT shift left
-            if len(padded_waveform) < max_length:
-                padded_waveform = np.pad(padded_waveform, (0, max_length - len(padded_waveform)), 'constant')
+        # ---- Clean zero-buffer centring ----
+        src_start = max_index - half   # may be negative
+        src_end   = max_index + half   # may exceed waveform length
 
-        elif current_length < max_length:
-            # PAMGuard: pad to centre peak at max_length//2, pad right only — no negative correction
-            max_index  = np.argmax(waveform)
-            pad_before = max(0, max_length // 2 - max_index)
-            pad_after  = max_length - (current_length + pad_before)
-            # PAMGuard does NOT apply a negative pad_after correction — just clamp to 0
-            padded_waveform = np.pad(waveform, (pad_before, max(0, pad_after)), 'constant')
-            # if still short due to clamping, pad right
-            if len(padded_waveform) < max_length:
-                padded_waveform = np.pad(padded_waveform, (0, max_length - len(padded_waveform)), 'constant')
+        out_start = 0
+        out_end   = max_length
 
-        else:
-            padded_waveform = waveform
+        # Clamp source to valid waveform range, shift output window accordingly
+        if src_start < 0:
+            out_start = -src_start
+            src_start = 0
+        if src_end > len(waveform):
+            out_end = max_length - (src_end - len(waveform))
+            src_end = len(waveform)
 
-        clipped_waveforms.append(padded_waveform)
-        padded_waveforms.append(padded_waveform)
+        output = np.zeros(max_length, dtype=np.float32)
+        output[out_start:out_end] = waveform[src_start:src_end]
 
-    return np.array(padded_waveforms, dtype=np.float32).reshape(-1, max_length, 1), removed_indices, clipped_waveforms
+        assert len(output) == max_length, f"idx {idx}: output length {len(output)} != {max_length}"
 
+        padded_waveforms.append(output)
+        clipped_waveforms.append(output)
+
+    return (
+        np.array(padded_waveforms, dtype=np.float32).reshape(-1, max_length, 1),
+        removed_indices,
+        clipped_waveforms
+    )
 
 def get_last_entry_date(csv_file_path):
     if not os.path.isfile(csv_file_path):
